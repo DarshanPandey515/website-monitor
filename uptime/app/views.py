@@ -9,16 +9,14 @@ from .models import Website
 from .serializers import WebsiteSerializer
 
 
-
-
 class MeView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         user = request.user
         return Response({
-            "id":user.id,
-            "username":user.username
+            "id": user.id,
+            "username": user.username
         })
 
 
@@ -89,15 +87,42 @@ class LogoutAPIView(APIView):
         return response
 
 
-class WebsiteAPIView(APIView):
+class WebsiteListAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
+    def get(self, request):
+        websites = Website.objects.filter(user=request.user)
+        serializer = WebsiteSerializer(websites, many=True)
+        return Response(serializer.data)
+
     def post(self, request):
-
         serializer = WebsiteSerializer(data=request.data)
-
         if serializer.is_valid():
             serializer.save(user=request.user)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
-
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class WebsiteDetailAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self, request, pk):
+        return Website.objects.get(pk=pk, user=request.user)
+
+    def get(self, request, pk):
+        website = self.get_object(request, pk)
+        serializer = WebsiteSerializer(website)
+        return Response(serializer.data)
+
+    def put(self, request, pk):
+        website = self.get_object(request, pk)
+        serializer = WebsiteSerializer(website, data=request.data)
+        if serializer.is_valid():
+            serializer.save(user=request.user)
+            return Response(serializer.data)
+        return Response(serializer.errors, status=400)
+
+    def delete(self, request, pk):
+        website = self.get_object(request, pk)
+        website.delete()
+        return Response(status=204)

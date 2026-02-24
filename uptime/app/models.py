@@ -14,10 +14,11 @@ class Website(models.Model):
 
     interval = models.IntegerField(help_text='minutes')
 
-    last_checked = models.DateTimeField(null=True, blank=True)
+    last_checked = models.DateTimeField(null=True, blank=True, db_index=True)
     last_status = models.BooleanField(null=True)
     last_response_time = models.FloatField(null=True)
-
+    is_active = models.BooleanField(default=True)
+    
     def __str__(self):
         return f"{self.website_name} - {self.user.username}"
 

@@ -1,60 +1,59 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import Login from './pages/Login'
-import Dashboard from './pages/Dashboard'
-import { Navigate } from 'react-router-dom';
+import React, {useEffect,} from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import Dashboard from './pages/Dashboard';
+import HomePage from './pages/HomePage';
+import SettingsPage from './pages/SettingsPage';
+import Login from './pages/Login';
+import WebsitesPage from './pages/WebsitesPage';
+import DetailWebsitePage from './pages/DetailWebsitePage';
 import { useAuthStore } from './utils/authStore';
-import { useEffect, useState } from 'react';
 
-
-function ProtectedRoute({ children }) {
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-
-  if (!isAuthenticated) {
-    return <Navigate to="/" replace />;
-  }
-
-  return children;
-}
-
-
-
-
+const ProtectedRoute = ({ children }) => {
+    const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+    return isAuthenticated ? children : <Navigate to="/login" replace />;
+};
 
 function App() {
-  const refresh = useAuthStore((state) => state.refresh);
-  const loading = useAuthStore((state) => state.loading);
+    const refresh = useAuthStore((state) => state.refresh);
+    const loading = useAuthStore((state) => state.loading);
 
 
-  useEffect(() => {
-    refresh();
-  }, []);
+    useEffect(() => {
+        refresh();
+    }, []);
 
 
-  if (loading) {
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <div className="w-8 h-8 border-4 border-zinc-100 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+        )
+    }
+
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="w-8 h-8 border-4 border-zinc-100 border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    )
+        <Router>
+            <Routes>
+                <Route path="/login" element={<Login />} />
 
-  }
+                {/* Dashboard Layout with nested routes */}
+                <Route path="/dashboard" element={
+                    <ProtectedRoute>
+                        <Dashboard />
+                    </ProtectedRoute>
+                }>
+                    {/* This is the default route - shows HomePage */}
+                    <Route index element={<HomePage />} />
+                    <Route path="websites" element={<WebsitesPage />} />
+                    <Route path="websites/:id" element={<DetailWebsitePage />} />
+                    <Route path="settings" element={<SettingsPage />} />
+                </Route>
 
-  return (
-    <Router>
-      <Routes>
-
-        <Route path="/" element={<Login />} />
-
-        <Route path="/dashboard" element={
-          <ProtectedRoute>
-            <Dashboard />
-          </ProtectedRoute>
-        } />
-
-
-      </Routes>
-    </Router>
-  );
+                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Routes>
+        </Router>
+    );
 }
 
 export default App;

@@ -9,7 +9,8 @@ urlpatterns = [
     path('auth/me/', MeView.as_view(), name='me'),
     path('auth/refresh/', RefreshAPIView.as_view(), name='token_refresh'),
     path('auth/logout/', LogoutAPIView.as_view(), name='logout'),
-    path('website/', WebsiteAPIView.as_view(), name='website'),
+    path('website/', WebsiteListAPIView.as_view(), name='website'),
+    path('website/<int:pk>/', WebsiteDetailAPIView.as_view(), name='website_detail'),
     
 
 ]
