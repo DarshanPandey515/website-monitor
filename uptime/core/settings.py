@@ -119,7 +119,10 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
+import os
+
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 
 # **************************
@@ -179,4 +182,29 @@ DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
 
 CELERY_TASK_ROUTES = {
     "app.tasks.check_website": {"queue": "monitoring"},
+}
+
+
+
+
+# channels
+
+
+ASGI_APPLICATION = "core.asgi.application"
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [("127.0.0.1", 6379)],
+        },
+    },
+}
+
+
+CELERY_BEAT_SCHEDULE = {
+    "monitor-websites": {
+        "task": "app.tasks.monitor_websites",
+        "schedule": 10.0,  # every 10 seconds — tight polling loop
+    },
 }

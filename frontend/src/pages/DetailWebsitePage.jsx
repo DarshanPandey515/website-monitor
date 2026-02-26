@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import * as Icons from 'phosphor-react';
 import { fetchWebsiteId } from '../utils/websiteService';
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-
+import { useAuthStore } from '../utils/authStore';
 
 const DetailWebsitePage = () => {
     const queryClient = useQueryClient();
@@ -12,12 +12,98 @@ const DetailWebsitePage = () => {
     const [timeRange, setTimeRange] = useState('24h');
     const [selectedTab, setSelectedTab] = useState('overview');
 
+    const accessToken = useAuthStore((state) => state.accessToken);
+
+    // Dedicated state for last_checked so the live timer resets immediately
+    // when a WebSocket message arrives, without waiting for React Query's
+    // async cache → re-render cycle.
+    const [lastCheckedAt, setLastCheckedAt] = useState(null);
+
+    useEffect(() => {
+        if (!accessToken || !id) return;
+
+        let socket = null;
+        let isMounted = true;
+
+        const connect = () => {
+            if (!isMounted) return;
+
+            socket = new WebSocket(
+                `ws://localhost:8000/ws/monitor/?token=${accessToken}`
+            );
+
+            socket.onopen = () => {
+                console.log("WebSocket connected");
+            };
+
+            socket.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+
+                if (String(data.website.id) !== String(id)) return;
+
+                // ✅ Reset the live timer immediately — don't rely on cache timing
+                setLastCheckedAt(data.website.last_checked);
+
+                queryClient.setQueryData(["website", id], (oldData) => {
+                    if (!oldData) return oldData;
+
+                    return {
+                        ...oldData,
+                        website: {
+                            ...oldData.website,
+                            ...data.website,
+                        },
+                        metrics: data.metrics,
+                        recent_checks: [
+                            data.new_check,
+                            ...oldData.recent_checks
+                        ].slice(0, 50)
+                    };
+                });
+            };
+
+            socket.onclose = () => {
+                if (isMounted) {
+                    setTimeout(connect, 3000);
+                }
+            };
+        };
+
+        connect();
+
+        return () => {
+            isMounted = false;
+            if (socket) {
+                socket.onclose = null;
+                socket.close();
+            }
+        };
+    }, [accessToken, id]);
+
+    const [now, setNow] = useState(Date.now());
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setNow(Date.now());
+        }, 1000);
+
+        return () => clearInterval(interval);
+    }, []);
+
+
     const { data, isLoading } = useQuery({
         queryKey: ["website", id],
         queryFn: () => fetchWebsiteId(id),
         enabled: !!id,
 
     })
+
+    // Seed lastCheckedAt from the initial REST fetch (runs once after load)
+    useEffect(() => {
+        if (data?.website?.last_checked && !lastCheckedAt) {
+            setLastCheckedAt(data.website.last_checked);
+        }
+    }, [data?.website?.last_checked]);
 
     if (isLoading) return (
         <div className="flex items-center justify-center min-h-screen">
@@ -30,50 +116,11 @@ const DetailWebsitePage = () => {
     const metrics = data.metrics;
     const recentChecks = data.recent_checks || []
 
-    console.log("websiteData", websiteData);
-    console.log("metrics", metrics);
-    console.log("recentChecks", recentChecks);
-
-
-    // Mock uptime history
-    const uptimeHistory = [
-        { time: '00:00', uptime: 100, response: 120 },
-        { time: '01:00', uptime: 99.9, response: 145 },
-        { time: '02:00', uptime: 100, response: 118 },
-        { time: '03:00', uptime: 100, response: 122 },
-        { time: '04:00', uptime: 98.5, response: 234 },
-        { time: '05:00', uptime: 100, response: 119 },
-        { time: '06:00', uptime: 100, response: 121 },
-        { time: '07:00', uptime: 99.8, response: 156 },
-        { time: '08:00', uptime: 100, response: 118 },
-        { time: '09:00', uptime: 100, response: 124 },
-        { time: '10:00', uptime: 100, response: 119 },
-        { time: '11:00', uptime: 99.7, response: 189 }
-    ];
-
-    // Mock incidents
-    const incidents = [
-        {
-            id: 1,
-            title: 'High Response Time',
-            status: 'resolved',
-            severity: 'medium',
-            startTime: '2024-01-15 14:30',
-            endTime: '2024-01-15 15:45',
-            duration: '1h 15m',
-            description: 'Response time spiked to 2.3s due to database connection issues'
-        },
-        {
-            id: 2,
-            title: 'Service Unavailable',
-            status: 'resolved',
-            severity: 'high',
-            startTime: '2024-01-14 09:20',
-            endTime: '2024-01-14 10:05',
-            duration: '45m',
-            description: 'Website was down due to server restart'
-        }
-    ];
+    console.log("websiteData:",websiteData);
+    console.log("metrics:",metrics);
+    console.log("recentChecks:",recentChecks);
+    
+    
 
     const formatRelativeTime = (isoString) => {
         const date = new Date(isoString);
@@ -87,12 +134,38 @@ const DetailWebsitePage = () => {
         return date.toLocaleString();
     };
 
-    const getStatusColor = (status) =>
-        status ? 'text-green-400' : 'text-red-400';
+    const formatLiveRelativeTime = (isoString) => {
+        if (!isoString) return "Never";
+
+        const date = new Date(isoString);
+        const diffMs = now - date;   // <-- use live "now"
+        const diffSecs = Math.floor(diffMs / 1000);
+
+        if (diffSecs < 5) return "Just now";
+        if (diffSecs < 60) return `${diffSecs}s ago`;
+        if (diffSecs < 3600) return `${Math.floor(diffSecs / 60)}m ago`;
+        if (diffSecs < 86400) return `${Math.floor(diffSecs / 3600)}h ago`;
+
+        return date.toLocaleString();
+    };
 
     const getStatusIcon = (status) =>
         status ? <Icons.CheckCircle size={16} weight="fill" /> : <Icons.XCircle size={16} weight="fill" />;
 
+    const formatDuration = (isoString) => {
+        if (!isoString) return "00:00:00";
+
+        const start = new Date(isoString).getTime();
+        const diff = Math.max(0, now - start);
+
+        const totalSeconds = Math.floor(diff / 1000);
+
+        const hours = String(Math.floor(totalSeconds / 3600)).padStart(2, "0");
+        const minutes = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, "0");
+        const seconds = String(totalSeconds % 60).padStart(2, "0");
+
+        return `${hours}:${minutes}:${seconds}`;
+    };
 
     return (
         <div className="p-8">
@@ -124,12 +197,12 @@ const DetailWebsitePage = () => {
                     </div>
                 </div>
                 <div className="flex items-center space-x-3">
-                    <button className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm transition-colors flex items-center space-x-2">
-                        <Icons.Pause size={18} weight="bold" />
+                    <button className="px-4 py-1.5 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm transition-colors flex items-center space-x-2">
+                        <Icons.Pause size={11} weight="bold" />
                         <span>Pause Monitoring</span>
                     </button>
-                    <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm transition-colors flex items-center space-x-2">
-                        <Icons.ArrowsClockwise size={18} weight="bold" />
+                    <button className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm transition-colors flex items-center space-x-2">
+                        <Icons.ArrowsClockwise size={11} weight="bold" />
                         <span>Check Now</span>
                     </button>
                 </div>
@@ -142,9 +215,9 @@ const DetailWebsitePage = () => {
                 <div className="bg-zinc-900/80 backdrop-blur-sm rounded-xl p-4 border border-zinc-800 hover:border-emerald-500/50 hover:bg-emerald-500/5 transition-all duration-300 group">
                     <div className="flex items-start justify-between">
                         <div className="flex-1 min-w-0">
-                            <p className="text-zinc-400 text-sm mb-2">Uptime (30d)</p>
+                            <p className="text-zinc-400 text-sm mb-2">Uptime (24h)</p>
                             <p className="text-3xl font-bold bg-gradient-to-r from-emerald-400 to-green-400 bg-clip-text text-transparent drop-shadow-sm">
-                                {metrics?.uptime_24h || '99.9'}%
+                                {metrics?.uptime_24h}%
                             </p>
                         </div>
                         <Icons.ArrowCircleUp
@@ -191,17 +264,7 @@ const DetailWebsitePage = () => {
                                 ? 'text-green-400 drop-shadow-sm'
                                 : 'text-red-400 animate-pulse drop-shadow-sm'
                                 }`}>
-                                {(() => {
-                                    const date = new Date(websiteData.last_checked);
-                                    const now = new Date();
-                                    const diffMs = now - date;
-                                    const diffMins = Math.floor(diffMs / 60000);
-
-                                    if (diffMins < 1) return "Just now";
-                                    if (diffMins < 60) return `${diffMins}m ago`;
-                                    if (diffMins < 1440) return `${Math.floor(diffMins / 60)}h ago`;
-                                    return date.toLocaleString();
-                                })()}
+                                {formatDuration(lastCheckedAt)} ago
                             </p>
                         </div>
 

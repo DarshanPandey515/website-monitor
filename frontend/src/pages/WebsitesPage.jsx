@@ -100,6 +100,7 @@ const WebsitesPage = () => {
                                          focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500
                                          transition-colors"
                             >
+                                <option value="1">Every 1 minutes</option>
                                 <option value="5">Every 5 minutes</option>
                                 <option value="15">Every 15 minutes</option>
                                 <option value="30">Every 30 minutes</option>
