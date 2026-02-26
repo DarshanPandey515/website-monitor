@@ -33,3 +33,9 @@ class CheckResult(models.Model):
 
     class Meta:
         ordering = ["-checked_at"]
+        indexes = [
+            models.Index(fields=["website", "checked_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.website.website_name}"

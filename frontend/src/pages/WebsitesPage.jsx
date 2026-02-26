@@ -23,6 +23,9 @@ const WebsitesPage = () => {
         queryFn: fetchWebsite,
     })
 
+    console.log(websites);
+
+
     const handleSubmit = (e) => {
         e.preventDefault();
 
@@ -150,7 +153,6 @@ const WebsitesPage = () => {
                                 <th className="px-6 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">Website</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">URL</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">Interval</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">Uptime</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">Response</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">Last Check</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">Actions</th>
@@ -162,8 +164,13 @@ const WebsitesPage = () => {
                                     <td className="px-6 py-4 font-medium">{index + 1}</td>
                                     <td className="px-6 py-4">
                                         <span className="flex items-center">
-                                            <span className="w-2 h-2 rounded-full bg-green-400 mr-2"></span>
-                                            <span className="text-sm text-green-400">Operational</span>
+                                            <span
+                                                className={`w-2 h-2 rounded-full ${site.last_status ? "text-green-400" : "text-red-400"} mr-2 `}></span>
+                                            <span className={`text-sm ${site.last_status ? "text-green-400" : "text-red-400"
+                                                }`}>
+                                                {site.last_status ? "Operational" : "Down"}
+                                            </span>
+
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 font-medium">
@@ -173,9 +180,12 @@ const WebsitesPage = () => {
                                     </td>
                                     <td className="px-6 py-4 text-sm text-zinc-400">{site.website_url}</td>
                                     <td className="px-6 py-4 text-sm">{site.interval} minutes</td>
-                                    <td className="px-6 py-4 text-sm text-green-400">99.98%</td>
-                                    <td className="px-6 py-4 text-sm">124ms</td>
-                                    <td className="px-6 py-4 text-sm text-zinc-400">2 min ago</td>
+                                    <td className="px-6 py-4 text-sm">
+                                        {site.last_response_time ? `${Math.round(site.last_response_time)} ms` : "-"}
+                                    </td>
+                                    <td className="px-6 py-4 text-sm text-zinc-400">
+                                        {new Date(site.last_checked).toLocaleString()}
+                                    </td>
                                     <td className="px-6 py-4">
                                         <div className="flex items-center space-x-3">
                                             <button className="text-zinc-400 hover:text-blue-400 transition-colors" title="Edit">

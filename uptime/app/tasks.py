@@ -8,10 +8,12 @@ from .models import *
 
 @shared_task
 def monitor_websites():
-    print("monitor working")
     now = timezone.now()
 
     websites = Website.objects.all()
+
+    print("monitor working", now)
+    print(websites)
 
     for website in websites:
         if website.last_checked is None:
@@ -49,12 +51,12 @@ def check_website(website_id):
         website.save()
 
     except Exception as e:
-        if website:
-            CheckResult.objects.create(
-                website=website,
-                status=False,
-                error_message=str(e),
-            )
-            website.last_checked = timezone.now()
-            website.last_status = False
-            website.save()
+        CheckResult.objects.create(
+            website=website,
+            status=False,
+            error_message=str(e),
+        )
+
+        website.last_checked = timezone.now()
+        website.last_status = False
+        website.save()

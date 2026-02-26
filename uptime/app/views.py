@@ -1,3 +1,7 @@
+from datetime import timedelta
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
+from django.db.models import Avg, Count, Q
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -5,8 +9,8 @@ from rest_framework.permissions import IsAuthenticated
 from django.contrib.auth import authenticate
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
-from .models import Website
-from .serializers import WebsiteSerializer
+from .models import *
+from .serializers import *
 
 
 class MeView(APIView):
@@ -107,12 +111,39 @@ class WebsiteDetailAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get_object(self, request, pk):
-        return Website.objects.get(pk=pk, user=request.user)
-
+        return get_object_or_404(Website, pk=pk, user=request.user)
+    
     def get(self, request, pk):
         website = self.get_object(request, pk)
+        now = timezone.now()
+
+        last_24h = now - timedelta(hours=24)
+
+        check_24h = website.checks.filter(checked_at__gte=last_24h)
+
+        total_checks = check_24h.count()
+        successfull_checks = check_24h.filter(status=True).count()
+
+        uptime = 0
+        if total_checks > 0:
+            uptime = round((successfull_checks / total_checks) * 100, 2)
+
+        avg_response = check_24h.aggregate(
+            avg=Avg("response_time")
+        )["avg"] or 0
+
+        recent_checks = website.checks.all()[:50]
+
         serializer = WebsiteSerializer(website)
-        return Response(serializer.data)
+        return Response({
+            "website": serializer.data,
+            "metrics": {
+                "uptime_24h": uptime,
+                "avg_response_24h": avg_response,
+                "total_check_24h": total_checks
+            },
+            "recent_checks": CheckResultSerializer(recent_checks, many=True).data
+        })
 
     def put(self, request, pk):
         website = self.get_object(request, pk)

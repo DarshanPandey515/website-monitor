@@ -170,3 +170,13 @@ CORS_ALLOW_METHODS = [
     'POST',
     'PUT',
 ]
+
+
+
+DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
+
+
+
+CELERY_TASK_ROUTES = {
+    "app.tasks.check_website": {"queue": "monitoring"},
+}
